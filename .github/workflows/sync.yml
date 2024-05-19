@@ -24,22 +24,28 @@ jobs:
     - name: Configure Git
       run: |
         git config --global user.name 'GitHubActionsBot'
-        git config --global user.email 'SyncBot@github.com'
+        git config --global user.email 'SyncBot@github.com' 
 
-    - name: Update Commit Message
+    - name: Ensure Subtree Exists
       run: |
-        BUILD_NUMBER=$(date +%s)
-        TRIGGERED_BY=${{ github.actor }}
-        git commit --allow-empty --amend -m "Build $BUILD_NUMBER triggered by $TRIGGERED_BY"
-        git push --force-with-lease
+        if [ ! -d "$SUBREPO_DIR" ]; then
+          git subtree add --prefix=$SUBREPO_DIR $SUBREPO_REMOTE $SUBREPO_BRANCH --squash
+        fi
+      env:
+        SUBREPO_REMOTE: git@github.com:HollyFoxtel/ComponentA.git
+        SUBREPO_BRANCH: main
+        SUBREPO_DIR: componentA     
 
     - name: Sync to SubRepo
       env:
-        SUBREPO_REMOTE: git@github.com:HollyFoxtel/TreeComponent.git
+        SUBREPO_REMOTE: git@github.com:HollyFoxtel/ComponentA.git
         SUBREPO_BRANCH: main
-        SUBREPO_DIR: ComponentA
+        SUBREPO_DIR: componentA
       run: |
-        git subtree pull --prefix=$SUBREPO_DIR --squash $SUBREPO_REMOTE $SUBREPO_BRANCH
+        BUILD_NUMBER=${{ github.run_number }}
+        TRIGGERED_BY=${{ github.actor }}
+
+        git subtree pull --prefix=$SUBREPO_DIR --squash $SUBREPO_REMOTE $SUBREPO_BRANCH -m "Auto-update $BUILD_NUMBER triggered by $TRIGGERED_BY"
         
         SPLIT_COMMIT=$(git subtree split --prefix=$SUBREPO_DIR --rejoin --squash --annotate="split: $SUBREPO_DIR - Build $BUILD_NUMBER triggered by $TRIGGERED_BY")
         
@@ -48,4 +54,4 @@ jobs:
         fi
 
     - name: Push SuperRepo Changes
-      run: git push
+      run: git push origin main
