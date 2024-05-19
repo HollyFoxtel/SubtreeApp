@@ -1,0 +1,51 @@
+name: Sync Subtree
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync-subtree:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout SuperRepo
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup SSH Keys
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.TREE_KEY }}
+
+    - name: Configure Git
+      run: |
+        git config --global user.name 'GitHubActionsBot'
+        git config --global user.email 'SyncBot@github.com'
+
+    - name: Update Commit Message
+      run: |
+        BUILD_NUMBER=$(date +%s)
+        TRIGGERED_BY=${{ github.actor }}
+        git commit --allow-empty --amend -m "Build $BUILD_NUMBER triggered by $TRIGGERED_BY"
+        git push --force-with-lease
+
+    - name: Sync to SubRepo
+      env:
+        SUBREPO_REMOTE: git@github.com:HollyFoxtel/TreeComponent.git
+        SUBREPO_BRANCH: main
+        SUBREPO_DIR: ComponentA
+      run: |
+        git subtree pull --prefix=$SUBREPO_DIR --squash $SUBREPO_REMOTE $SUBREPO_BRANCH
+        
+        SPLIT_COMMIT=$(git subtree split --prefix=$SUBREPO_DIR --rejoin --squash --annotate="split: $SUBREPO_DIR - Build $BUILD_NUMBER triggered by $TRIGGERED_BY")
+        
+        if [ -n "$SPLIT_COMMIT" ]; then
+          git subtree push --prefix=$SUBREPO_DIR $SUBREPO_REMOTE $SUBREPO_BRANCH
+        fi
+
+    - name: Push SuperRepo Changes
+      run: git push
