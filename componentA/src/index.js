@@ -5,3 +5,7 @@ function renderComponentA() {
 function newCommitFromComponent() {
     console.log("[Component]render Component A") 
 }
+
+function newCommitFromMain() {
+    console.log("[Super]render super repo") 
+}
